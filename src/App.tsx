@@ -10,26 +10,39 @@ import {
 import { makeStyles } from "@material-ui/core/styles";
 import { hot } from "react-hot-loader/root";
 import ListComponents from "./ListComponents";
-import { Name } from "./NameInterFace";
+import { Name, NameList } from "./NameInterFace";
 import "@fontsource/barlow";
+import { saveToLocal, retrieveData } from "./util";
+
 
 const App = () => {
   const classes = useStyles();
-  const [nameState, setNameState] = useState<Name>({
+  const [form, setForm] = useState<Name>({
     name: "",
     surname: "",
     id: 0,
   });
   const [filterData, setFilterData] = useState("");
-  const [listOfNames, setListOfNames] = useState<Name[]>([]);
+  const [listOfName, setListOfName] = useState<NameList>([]);
+  const [filterListOfName, setFilterListOfName] = useState<NameList>([]);
+  const [itemClicked, setItemClicked] = useState<boolean>(true);
+
   useEffect(() => {
     const returnData = retrieveData();
-    setListOfNames(returnData);
+    setListOfName(returnData);
   }, []);
+
+  useEffect(() => {
+    if (filterData) {
+      return setFilterListOfName(listOfName.filter((list => list.surname.toLowerCase().indexOf(filterData.toLowerCase()) > -1)))
+    }
+    setFilterListOfName(listOfName);
+
+  }, [filterData, listOfName]);
 
   const handleTextField = ({ target }: React.ChangeEvent<HTMLInputElement>) => {
     const { value, name } = target;
-    setNameState((state: Name) => ({
+    setForm((state: Name) => ({
       ...state,
       [name]: value,
     }));
@@ -37,9 +50,12 @@ const App = () => {
 
   const handleCreate = () => {
     const uniqueId = Math.floor(Math.random() * 1000 + 10);
-    const checkName = nameState.name.replace(/\s+/g, "");
-    const checkSurname = nameState.surname.replace(/\s+/g, "");
-    setListOfNames((state) => [
+    const checkName = form.name.replace(/\s+/g, "");
+    const checkSurname = form.surname.replace(/\s+/g, "");
+
+    if (checkName === '' && checkSurname === '') return;
+
+    setListOfName((state) => [
       ...state,
       {
         name: checkName,
@@ -56,60 +72,40 @@ const App = () => {
       },
     ];
     saveToLocal(updateData);
-    resetName();
+    resetForm();
   };
 
-  const listClicked = (item: Name) => {
-    setNameState({
-      ...item,
-    });
-  };
-
-  const resetName = () => {
-    setNameState({ name: "", surname: "", id: 0 });
+  const resetForm = () => {
+    setForm({ name: "", surname: "", id: 0 });
   };
 
   const handleDelete = () => {
-    const updateData = retrieveData().filter(
-      (data: Name) => data.id !== nameState.id
-    );
-    setListOfNames(updateData);
+    const updateData = retrieveData().filter(data => data.id !== form.id);
+
+    setListOfName(updateData);
     saveToLocal(updateData);
-    resetName();
+    resetForm();
   };
 
   const handleUpdate = () => {
-    const found = listOfNames.map((name) => {
-      if (name.id === nameState.id) {
-        return (name = nameState);
-      }
+    // TODO: find by id and update instead of looping for performance
+    const found = listOfName.map((name) => {
+      if (name.id === form.id) return form;
+
       return name;
     });
-    setListOfNames(found);
+    setListOfName(found);
     saveToLocal(found);
-    resetName();
+    resetForm();
   };
 
-  const handleFilterData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const searchWords = event.target.value;
-    setFilterData(searchWords);
+  const handleFilterData = ({ target }: React.ChangeEvent<HTMLInputElement>) => {
+    setFilterData(target.value);
   };
 
-  const saveToLocal = (data: Name[]) => {
-    const stringData = JSON.stringify(data);
-    localStorage.setItem("localStorageData", stringData);
-  };
-
-  const retrieveData = () => {
-    const localData = localStorage.getItem("localStorageData") || "[]";
-    const localStorageData = JSON.parse(localData);
-    return localStorageData;
-  };
-  const [itemClicked, setItemClicked] = useState<boolean>(true);
-
-  const childToParent = (items: Name) => {
+  const handleNameClick = (items: Name) => {
     setItemClicked(false);
-    setNameState(items);
+    setForm(items);
   };
 
   return (
@@ -133,19 +129,11 @@ const App = () => {
           <Grid container>
             <Grid item xs={6}>
               <Paper
-                style={{
-                  margin: 10,
-                  minHeight: 200,
-                  maxHeight: 200,
-                }}
+                className={classes.listItemDisplay}
               >
                 <ListComponents
-                  nameState={nameState}
-                  listClicked={listClicked}
-                  listOfNames={listOfNames}
-                  retrieveData={retrieveData}
-                  filterData={filterData}
-                  childToParent={childToParent}
+                  items={filterListOfName}
+                  onClick={handleNameClick}
                 />
               </Paper>
             </Grid>
@@ -166,7 +154,7 @@ const App = () => {
                     className={classes.textfield}
                     id="outlined"
                     variant="outlined"
-                    value={nameState.name || ""}
+                    value={form.name || ""}
                     fullWidth
                   />
                 </Grid>
@@ -178,7 +166,7 @@ const App = () => {
                     className={classes.textfield}
                     id="outlined"
                     variant="outlined"
-                    value={nameState.surname || ""}
+                    value={form.surname || ""}
                   />
                 </Grid>
               </Grid>
@@ -260,5 +248,11 @@ const useStyles = makeStyles({
     fontFamily: "Barlow",
     fontWeight: "bold",
   },
+  listItemDisplay:{
+    margin: '1rem 0',
+    minHeight: 200,
+    maxHeight: 200,
+    overflow: 'auto'
+  }
 });
 export default hot(App);
